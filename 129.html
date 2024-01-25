@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en-US" class="glue-flexbox">
   <head>
-    <title>AIP-157: Partial responses</title>
+    <title>AIP-129: Server-Modified Values and Defaults</title>
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,maximum-scale=2">
@@ -273,7 +273,7 @@
         Declarative-friendly interfaces
       </a>
     </li>
-    <li class="nav-item">
+    <li class="nav-item nav-item-active">
       <a href="/129">
         <span class="aip-number">129</span>
         Server-Modified Values and Defaults
@@ -417,7 +417,7 @@
         Singleton resources
       </a>
     </li>
-    <li class="nav-item nav-item-active">
+    <li class="nav-item">
       <a href="/157">
         <span class="aip-number">157</span>
         Partial responses
@@ -615,20 +615,28 @@
           
 <aside id="aip-sidebar" class="docs-component-sidebar">
   <table id="aip-summary">
-    <tr><th colspan="2">Partial responses</th></tr>
-    <tr><td>Number</td><td>157</td></tr>
-    <tr><td>Permalink</td><td><a href="https://google.aip.dev/157">google.aip.dev/157</a></td></tr>
+    <tr><th colspan="2">Server-Modified Values and Defaults</th></tr>
+    <tr><td>Number</td><td>129</td></tr>
+    <tr><td>Permalink</td><td><a href="https://google.aip.dev/129">google.aip.dev/129</a></td></tr>
     <tr><td>State</td><td>Approved</td></tr>
-    <tr><td>Created</td><td>2019-01-26</td></tr>
-    <tr><td>Updated</td><td>2019-01-26</td></tr>
+    <tr><td>Created</td><td>2023-09-20</td></tr>
+    <tr><td>Updated</td><td>2023-09-20</td></tr>
   </table>
 
   <section id="aip-toc" class="docs-component-sidebar-toc">
     <div class="toc"><span class="toctitle">Contents</span><ul>
 <li><a href="#guidance">Guidance</a><ul>
-<li><a href="#field-masks-parameter">Field masks parameter</a></li>
-<li><a href="#view-enumeration">View enumeration</a></li>
-<li><a href="#read-masks-as-a-request-field">Read masks as a request field</a></li>
+<li><a href="#single-owner-fields">Single Owner Fields</a></li>
+<li><a href="#effective-values">Effective Values</a></li>
+<li><a href="#user-specified-fields">User-Specified Fields</a></li>
+<li><a href="#normalizations">Normalizations</a></li>
+</ul>
+</li>
+<li><a href="#rationale">Rationale</a><ul>
+<li><a href="#rationale-for-single-owner-fields">Rationale for Single Owner Fields</a></li>
+<li><a href="#rationale-for-naming">Rationale for Naming</a></li>
+<li><a href="#rationale-for-normalizations">Rationale for Normalizations</a></li>
+<li><a href="#rationale-for-field-value-handling">Rationale for Field Value Handling</a></li>
 </ul>
 </li>
 <li><a href="#changelog">Changelog</a></li>
@@ -640,8 +648,8 @@
   <section class="docs-component-sidebar-actions">
     <ul>
       <li><a href="https://github.com/aip-dev/google.aip.dev/issues/">File Bug</a></li>
-      <li><a href="https://github.com/aip-dev/google.aip.dev/blob/master/aip/general/0157.md">View source</a></li>
-      <li><a href="https://github.com/aip-dev/google.aip.dev/edit/master/aip/general/0157.md">Edit this page</a></li>
+      <li><a href="https://github.com/aip-dev/google.aip.dev/blob/master/aip/general/0129.md">View source</a></li>
+      <li><a href="https://github.com/aip-dev/google.aip.dev/edit/master/aip/general/0129.md">Edit this page</a></li>
     </ul>
   </section>
 </aside>
@@ -666,86 +674,122 @@
       
       <li class="glue-breadcrumbs__item glue-breadcrumbs__item--active"
           aria-level="3">
-        Partial responses
+        Server-Modified Values and Defaults
       </li>
     </ol>
   </nav>
 </section>
   
-  <h4 class="aip-number">AIP-157</h4>
-  <h1 id="partial-responses">Partial responses</h1>
-<p>Sometimes, a resource can be either large or expensive to compute, and the API
-needs to give the user control over which fields it sends back.</p>
+  <h4 class="aip-number">AIP-129</h4>
+  <h1 id="server-modified-values-and-defaults">Server-Modified Values and Defaults</h1>
+<p>Services often provide default values for resource fields, and occasionally
+normalize the user input before returning it in the response. The guidance
+herein describes how services document such behavior for the benefit of
+consumers.</p>
 <h2 id="guidance">Guidance</h2>
-<p>APIs <strong>may</strong> support partial responses in one of two ways:</p>
-<h3 id="field-masks-parameter">Field masks parameter</h3>
-<p>Field masks (<code>google.protobuf.FieldMask</code>) can be used for granting the user
-fine-grained control over what fields are returned. An API <strong>should</strong> support the mask in a side channel.
-For example, the parameter can be specified either using an HTTP query
-parameter, an HTTP header, or a <a href="https://grpc.io/docs/what-is-grpc/core-concepts/#metadata">gRPC metadata entry</a>. Google Cloud APIs specify field masks as a <a href="https://cloud.google.com/apis/docs/system-parameters">system parameter</a>.</p>
-<p>Field masks <strong>should not</strong> be specified in the <a href="/157#read-masks-as-a-request-field">request</a>.</p>
+<h3 id="single-owner-fields">Single Owner Fields</h3>
+<p>Fields <strong>must</strong> have a single owner, whether that is the client or the server.
+Server owned fields <strong>must</strong> be indicated with the <code>OUTPUT_ONLY</code> field_behavior.
+All other types of fields <strong>must</strong> be considered to be owned by the client. The
+server <strong>must</strong> respect the value (or lack thereof) for all client owned fields
+and not modify them.</p>
+<h3 id="effective-values">Effective Values</h3>
+<p>There are instances where a service will allocate, generate, or calculate a
+value if the client chooses not to specify one. For example: a client creates a
+virtual machine without specifying a static IP address for the virtual machine
+to be available on. Such a scenario is opting into dynamic IP address
+allocation.</p>
+<p>Some examples of these types of fields are ones that are:</p>
 <ul>
-<li>The value of the field mask parameter <strong>must</strong> be a <code>google.protobuf.FieldMask</code>.</li>
-<li>The field mask parameter <strong>must</strong> be optional:<ul>
-<li>An explicit value of <code>"*"</code> <strong>should</strong> be supported, and <strong>must</strong> return all
-  fields.</li>
-<li>If the field mask parameter is omitted, it <strong>must</strong> default to <code>"*"</code>, unless otherwise documented.</li>
+<li>generated (UUID)</li>
+<li>allocated (dynamic IP address)</li>
+<li>assigned (most recent software package version)</li>
 </ul>
-</li>
-<li>An API <strong>may</strong> allow read masks with non-terminal repeated fields (unlike
-  update masks), but is not obligated to do so.</li>
+<p>An attribute with an effective value <strong><em>must</em></strong> be expressed as two fields in
+the API:</p>
+<ul>
+<li>a mutable field that can be optionally set by the user and <strong>must not</strong> be
+modified by the service</li>
+<li>an <code>OUTPUT_ONLY</code> field that records the effective value decided on by the
+service</li>
 </ul>
-<p><strong>Note:</strong> Changing the default value of the field mask parameter is a <a href="/180#semantic-changes">breaking change</a>.</p>
-<h3 id="view-enumeration">View enumeration</h3>
-<p>Alternatively, an API <strong>may</strong> support partial responses with view enums.
-View enums are useful for situations where an API only wants to expose a small
-number of permutations to the user:</p>
-<div class="highlight language-proto"><pre><span></span><code><span class="kd">enum</span> <span class="n">BookView</span> <span class="p">{</span>
-  <span class="c1">// The default / unset value.</span>
-  <span class="c1">// The API will default to the BASIC view.</span>
-  <span class="na">BOOK_VIEW_UNSPECIFIED</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-
-  <span class="c1">// Include basic metadata about the book, but not the full contents.</span>
-  <span class="c1">// This is the default value (for both ListBooks and GetBook).</span>
-  <span class="na">BOOK_VIEW_BASIC</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
-
-  <span class="c1">// Include everything.</span>
-  <span class="na">BOOK_VIEW_FULL</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+<p>Example:
+<div class="highlight language-proto"><pre><span></span><code><span class="kd">message</span> <span class="nc">VirtualMachine</span> <span class="p">{</span>
+  <span class="err">…</span>
+  <span class="kt">string</span> <span class="na">ip_address</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+  <span class="kt">string</span> <span class="na">effective_ip_address</span> <span class="o">=</span> <span class="mi">5</span> <span class="p">[</span>
+    <span class="p">(</span><span class="n">google.api.field_behavior</span><span class="p">)</span> <span class="o">=</span> <span class="n">OUTPUT_ONLY</span>
+  <span class="p">];</span>
 <span class="p">}</span>
-</code></pre></div>
+</code></pre></div></p>
+<h4 id="naming">Naming</h4>
+<p>Effective values <strong>must</strong> be named by prefixing <code>effective_</code> to the mutable
+field's name.</p>
+<h3 id="user-specified-fields">User-Specified Fields</h3>
+<p>For user-specified fields, the value in response from the service <strong>must</strong> be
+the same as provided by the create or update request. For string fields this
+means returning the value unchanged, with one exception: </p>
 <ul>
-<li>The enum <strong>should</strong> be specified as a <code>view</code> field on the request message.</li>
-<li>The enum <strong>should</strong> be named something ending in <code>-View</code></li>
-<li>The enum <strong>should</strong> at minimum have values named <code>BASIC</code> and <code>FULL</code> (although
-  it <strong>may</strong> have values other than these).</li>
-<li>The <code>UNSPECIFIED</code> value <strong>must</strong> be valid (not an error), and the API
-  <strong>must</strong> document what the unspecified value will do).<ul>
-<li>For List RPCs, the effective default value <strong>should</strong> be <code>BASIC</code>.</li>
-<li>For Get RPCs, the effective default value <strong>should</strong> be either <code>BASIC</code> or
-  <code>FULL</code>.</li>
+<li>When a string field has a data type annotation, a normalized string that
+  represents the given value <strong>may</strong> be returned.</li>
 </ul>
-</li>
-<li>The enum <strong>should</strong> be defined at the top level of the proto file (as it is
-  likely to be needed in multiple requests, e.g. both <code>Get</code> and <code>List</code>). See
-  <a href="/126">AIP-126</a> for more guidance on top-level enumerations.</li>
-<li>
-<p>APIs <strong>may</strong> add fields to a given view over time. APIs <strong>must not</strong> remove a
-  field from a given view (this is a breaking change).</p>
-<p><strong>Note:</strong> If a service requires (or might require) multiple views with
-overlapping but distinct values, there is a potential for a namespace
-conflict. In this situation, the service <strong>should</strong> nest the view enum within
-the individual resource.</p>
-</li>
+<h3 id="normalizations">Normalizations</h3>
+<p>A field that is normalized by the service <strong>must</strong> be annotated with the
+<code>google.api.field_info</code> extension. See <a href="aip-202">AIP-202</a> for guidance on using
+this extension The allowed set of normalizations includes the following formats:</p>
+<ul>
+<li>uuid</li>
+<li>ipv4</li>
+<li>ipv6</li>
+<li>email</li>
 </ul>
-<h3 id="read-masks-as-a-request-field">Read masks as a request field</h3>
-<p><strong>Warning:</strong> Read masks as a single field on the request message, for example: <code>google.protobuf.FieldMask read_mask</code> are <strong>DEPRECATED</strong>.</p>
+<p>Normalizations on fields <strong>must</strong> be described using the <code>google.api.field_info</code>
+annotation.</p>
+<h2 id="rationale">Rationale</h2>
+<p>Server-modified and default values often make it harder to implement
+<a href="state-driven-clients">state-driven clients</a>. These clients are often unable to
+tell when their desired state matches the current state for these fields, as the
+rules by which a server may modify and return values are complex, not public,
+and not repeatable.</p>
+<h3 id="rationale-for-single-owner-fields">Rationale for Single Owner Fields</h3>
+<p>When fields do not have a single owner they can cause issues for
+<a href="state-driven-clients">state-driven clients</a>. These clients may attempt to set
+values for fields that are overwritten by server set values, leading to the
+client entering an infinite loop to correct the change.</p>
+<h3 id="rationale-for-naming">Rationale for Naming</h3>
+<p>Consistent naming is important for identifying standard behavior across APIs
+and fields. Programmatic association between user-specified and effective values
+depends on consistent naming.</p>
+<h3 id="rationale-for-normalizations">Rationale for Normalizations</h3>
+<p>Normalizations are important to allow services to store and return values in a
+standard way while communicating to clients what changes are semantically
+identical. Normalizing a value on the service side allows the service to accept
+a wider range of semantically identical inputs without needing to maintain every
+value as a raw string. Surfacing the normalization that is being applied to
+clients allows for client side comparison of sent and retrieved values to check
+for differences.</p>
+<p>For example, in a resource that accepts an email address on a particular field
+a client may specify a given email address in a variety of ways. For the email
+<code>ada@example.com</code> a client may choose to specify <code>ADA@example.com</code>,
+<code>aDa@example.com</code>, or <code>AdA@example.com</code>. These are semantically identical and
+<em>should</em> all be accepted by the service. The service then may choose to
+normalize the email address for storage and retrieval through downcasing or
+canonicalization. Importantly, the information surfaced to clients on the
+normalization of a field will not describe the normalization algorithm itself,
+but instead the comparison method used to accurately compute if two values
+should be considered equal.</p>
+<h3 id="rationale-for-field-value-handling">Rationale for Field Value Handling</h3>
+<p>For fields not using an allowed normalization,
+<a href="./0009#declarative-clients">Declarative clients</a> will not be able to identify which changes are
+semantically meaningful. When a <a href="./0009#declarative-clients">Declarative client</a>
+sends a particular value it will ensure that the value is being returned by the
+service to validate it was set correctly.</p>
 <h2 id="changelog">Changelog</h2>
 <ul>
-<li><strong>2023-05-09</strong>: Fix top-level enum example and link to <a href="/126">AIP-126</a>.</li>
-<li><strong>2022-03-14:</strong> Updated guidance on default value and how to specify a read mask.</li>
-<li><strong>2021-10-06:</strong> Updated the guidance with system parameters.</li>
-<li><strong>2021-03-04:</strong> Added guidance for conflicting view enums.</li>
+<li><strong>2023-10-31:</strong> Update to approved.</li>
 </ul>
+<!-- prettier-ignore-start -->
+<!-- prettier-ignore-end -->
   <footer>
   Except as otherwise noted, the content of this page is licensed under the
   <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons
